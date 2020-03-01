@@ -17,31 +17,27 @@ import (
 
 var (
 	dbtype         = flag.String("dbtype", "mysql", "database type")
+	dbConn         = flag.String("dbConn", "root:@/core_test?charset=utf8", "database connect string")
 	createTableSql string
 )
 
-type User struct {
-	Id       int64
-	Name     string
-	Title    string
-	Age      float32
-	Alias    string
-	NickName string
-	Created  NullTime
-}
-
-func init() {
+func TestMain(m *testing.M) {
 	flag.Parse()
+
 	switch *dbtype {
 	case "sqlite3":
 		createTableSql = "CREATE TABLE IF NOT EXISTS `user` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NULL, " +
 			"`title` TEXT NULL, `age` FLOAT NULL, `alias` TEXT NULL, `nick_name` TEXT NULL, `created` datetime);"
 	case "mysql":
+		fallthrough
+	default:
 		createTableSql = "CREATE TABLE IF NOT EXISTS `user` (`id` INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL, `name` TEXT NULL, " +
 			"`title` TEXT NULL, `age` FLOAT NULL, `alias` TEXT NULL, `nick_name` TEXT NULL, `created` datetime);"
-	default:
-		panic("no db type")
 	}
+
+	exitCode := m.Run()
+
+	os.Exit(exitCode)
 }
 
 func testOpen() (*DB, error) {
@@ -50,7 +46,7 @@ func testOpen() (*DB, error) {
 		os.Remove("./test.db")
 		return Open("sqlite3", "./test.db")
 	case "mysql":
-		return Open("mysql", "root:@/core_test?charset=utf8")
+		return Open("mysql", *dbConn)
 	default:
 		panic("no db type")
 	}
@@ -98,6 +94,16 @@ func BenchmarkOriQuery(b *testing.B) {
 		}
 		rows.Close()
 	}
+}
+
+type User struct {
+	Id       int64
+	Name     string
+	Title    string
+	Age      float32
+	Alias    string
+	NickName string
+	Created  NullTime
 }
 
 func BenchmarkStructQuery(b *testing.B) {
