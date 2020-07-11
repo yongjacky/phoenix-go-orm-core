@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"strconv"
 	"sync"
 )
 
@@ -155,8 +156,18 @@ func (rs *Rows) ScanSlice(dest interface{}) error {
 	return nil
 }
 
-// scan data to a map's pointer
+// ScanMap is scanning data to a map's pointer
 func (rs *Rows) ScanMap(dest interface{}) error {
+	return rs.scanMapShare(dest, false)
+}
+
+// ScanMapByPhoenixCustom is handling custom use cases for phoenix projects
+func (rs *Rows) ScanMapByPhoenixCustom(dest interface{}) error {
+	return rs.scanMapShare(dest, true)
+}
+
+// scan data to a map's pointer
+func (rs *Rows) scanMapShare(dest interface{}, usePhoenixCustom bool) error {
 	vv := reflect.ValueOf(dest)
 	if vv.Kind() != reflect.Ptr || vv.Elem().Kind() != reflect.Map {
 		return errors.New("dest should be a map's pointer")
@@ -181,7 +192,21 @@ func (rs *Rows) ScanMap(dest interface{}) error {
 
 	for i, name := range cols {
 		vname := reflect.ValueOf(name)
-		vvv.SetMapIndex(vname, reflect.ValueOf(newDest[i]).Elem())
+
+		e := reflect.ValueOf(newDest[i]).Elem()
+		if usePhoenixCustom {
+			ei := e.Interface()
+			// convert uint8 type array to float64 type for PSQL's numeric data type
+			val, ok := ei.([]uint8)
+			if ok && val != nil {
+				float, _ := strconv.ParseFloat(string(val), 64)
+				e.Set(reflect.ValueOf(float))
+			}
+		}
+
+		vvv.SetMapIndex(vname, e)
+		//vvv.SetMapIndex(vname, reflect.ValueOf(newDest[i]).Elem())
+
 	}
 
 	return nil
